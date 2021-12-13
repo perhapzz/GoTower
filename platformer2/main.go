@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/csv"
+	"fmt"
 	"image"
 	"image/color"
 	"io"
@@ -19,6 +20,8 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/image/colornames"
 )
+
+var spe float64 = 20
 
 func loadAnimationSheet(sheetPath, descPath string, frameWidth float64) (sheet pixel.Picture, anims map[string][]pixel.Rect, err error) {
 	// total hack, nicely format the error at the end, so I don't have to type it every time
@@ -105,9 +108,17 @@ func (gp *gopherPhys) update(dt float64, ctrl pixel.Vec, platforms []platform) {
 	// apply controls
 	switch {
 	case ctrl.X < 0:
-		gp.vel.X = -gp.runSpeed
+		if gp.rect.Max.X > -160 {
+			gp.vel.X = -gp.runSpeed
+		} else {
+			gp.vel.X = -0.000001
+		}
 	case ctrl.X > 0:
-		gp.vel.X = +gp.runSpeed
+		if gp.rect.Max.X < 160 {
+			gp.vel.X = +gp.runSpeed
+		} else {
+			gp.vel.X = +0.000001
+		}
 	default:
 		gp.vel.X = 0
 	}
@@ -136,6 +147,9 @@ func (gp *gopherPhys) update(dt float64, ctrl pixel.Vec, platforms []platform) {
 	if gp.ground && ctrl.Y > 0 {
 		gp.vel.Y = gp.jumpSpeed
 	}
+	gp.rect.Min.Y += dt * spe
+	gp.rect.Max.Y += dt * spe
+	// fmt.Println(gp.rect.Center())
 }
 
 type animState int
@@ -183,7 +197,12 @@ func (ga *gopherAnim) update(dt float64, phys *gopherPhys) {
 	// determine the correct animation frame
 	switch ga.state {
 	case idle:
-		ga.frame = ga.anims["Front"][0]
+		i := int(math.Floor(ga.counter/ga.rate)) % 40
+		if i > 38 {
+			ga.frame = ga.anims["FrontBlink"][0]
+		} else if i == 0 {
+			ga.frame = ga.anims["Front"][0]
+		}
 	case running:
 		i := int(math.Floor(ga.counter / ga.rate))
 		ga.frame = ga.anims["Run"][i%len(ga.anims["Run"])]
@@ -236,6 +255,7 @@ type goal struct {
 
 func (g *goal) update(dt float64) {
 	g.counter += dt
+	g.pos.Y += dt * spe
 	for g.counter > g.step {
 		g.counter -= g.step
 		for i := len(g.cols) - 2; i >= 0; i-- {
@@ -265,6 +285,75 @@ again:
 	return pixel.RGB(r/len, g/len, b/len)
 }
 
+func rebuildPlatform(idx int, platforms []platform) []platform {
+	platforms = append(platforms[:idx], platforms[idx+1:]...)
+	r := float64(rand.Int63n(270))
+	pf := platform{rect: pixel.R(-160+r, -125, -110+r, -123), color: randomNiceColor()}
+	platforms = append(platforms, pf)
+	return platforms
+}
+
+func updatePlatforms(dt float64, platforms []platform) []platform {
+	for idx, plat := range platforms {
+		platforms[idx].rect.Max.Y += dt * spe
+		platforms[idx].rect.Min.Y += dt * spe
+		if plat.rect.Min.Y > 120 {
+			platforms = rebuildPlatform(idx, platforms)
+			// fmt.Println(idx)
+		}
+	}
+	return platforms
+}
+
+var score int = 0
+
+func updategoal(gol *goal, platforms []platform, gp *gopherPhys) goal {
+	if gol.pos.Y-gol.radius > 120 {
+		pf := platforms[len(platforms)-1]
+		x := (pf.rect.Max.X + pf.rect.Min.X) / 2
+		y := pf.rect.Max.Y + 10
+		return goal{
+			pos:    pixel.V(x, y),
+			radius: 5,
+			step:   1.0 / 7,
+		}
+	} else if gol.pos.X < gp.rect.Max.X+gol.radius && gol.pos.X > gp.rect.Min.X-gol.radius && gol.pos.Y < gp.rect.Max.Y+gol.radius && gol.pos.Y > gp.rect.Min.Y-gol.radius {
+		score += 1
+		pf := platforms[len(platforms)-1]
+		x := (pf.rect.Max.X + pf.rect.Min.X) / 2
+		y := pf.rect.Max.Y + 10
+		return goal{
+			pos:    pixel.V(x, y),
+			radius: 5,
+			step:   1.0 / 7,
+		}
+	}
+
+	// else if gol.pos.X-gp.rect.Max.X > gol.radius && gol.pos.X-gp.rect.Min.X > gol.radius &&
+	// 		((gol.pos.Y-gp.rect.Max.Y > 0 && gol.pos.Y-gp.rect.Min.Y > 0)|| (gol.pos.Y-gp.rect.Min.Y > 0)) {
+	// }
+	return *gol
+}
+
+// func ttfFromBytesMust(b []byte, size float64) font.Face {
+// 	ttf, err := truetype.Parse(b)
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	return truetype.NewFace(ttf, &truetype.Options{
+// 		Size:              size,
+// 		GlyphCacheEntries: 1,
+// 	})
+// }
+
+// type goalwriter struct {
+// 	mu sync.Mutex
+
+// 	regular *text.Text
+
+// 	position pixel.Vec
+// }
+
 func run() {
 	rand.Seed(time.Now().UnixNano())
 
@@ -287,7 +376,7 @@ func run() {
 		gravity:   -512,
 		runSpeed:  64,
 		jumpSpeed: 192,
-		rect:      pixel.R(-6, -7, 6, 7),
+		rect:      pixel.R(-6, 40, 6, 54),
 	}
 
 	anim := &gopherAnim{
@@ -297,28 +386,45 @@ func run() {
 		dir:   +1,
 	}
 
+	// golwriter := &goalwriter{
+	// 	regular: text.New(pixel.ZV, text.NewAtlas(
+	// 		ttfFromBytesMust(goregular.TTF, 42),
+	// 		text.ASCII, text.RangeTable(unicode.Latin),
+	// 	)),
+	// 	position: pixel.V(32, 32),
+	// }
+
+	// text.New(pixel.ZV, text.NewAtlas(
+	// 	ttfFromBytesMust(goregular.TTF, 42),
+	// 	text.ASCII, text.RangeTable(unicode.Latin),
+	// ))
+
 	// hardcoded level
 	platforms := []platform{
-		{rect: pixel.R(-50, -34, 50, -32)},
-		{rect: pixel.R(20, 0, 70, 2)},
-		{rect: pixel.R(-100, 10, -50, 12)},
-		{rect: pixel.R(120, -22, 140, -20)},
-		{rect: pixel.R(120, -72, 140, -70)},
-		{rect: pixel.R(120, -122, 140, -120)},
-		{rect: pixel.R(-100, -152, 100, -150)},
-		{rect: pixel.R(-150, -127, -140, -125)},
-		{rect: pixel.R(-180, -97, -170, -95)},
-		{rect: pixel.R(-150, -67, -140, -65)},
-		{rect: pixel.R(-180, -37, -170, -35)},
-		{rect: pixel.R(-150, -7, -140, -5)},
+		// {rect: pixel.R(20, 120, 70, 122)},
+		{rect: pixel.R(90, 100, 140, 102)},
+		{rect: pixel.R(-20, 80, 30, 82)},
+		{rect: pixel.R(-50, 60, 0, 62)},
+		{rect: pixel.R(0, 40, 50, 42)},
+		// {rect: pixel.R(-50, 39.7, 50, 41.7)},
+		{rect: pixel.R(-90, 20, -40, 22)},
+		{rect: pixel.R(30, 0, 80, 2)},
+		{rect: pixel.R(-110, -20, -60, -18)},
+		{rect: pixel.R(-10, -40, 40, -38)},
+		{rect: pixel.R(-100, -60, -50, -58)},
+		{rect: pixel.R(70, -80, 120, -78)},
+		{rect: pixel.R(-150, -100, -100, -98)},
+		{rect: pixel.R(-150, -120, -100, -118)},
+		// {rect: pixel.R(-100, -120, -50, -128)},
 	}
 	for i := range platforms {
 		platforms[i].color = randomNiceColor()
 	}
 
+	// {rect: pixel.R(-20, 80, 30, 82)},
 	gol := &goal{
-		pos:    pixel.V(-75, 40),
-		radius: 18,
+		pos:    pixel.V(5, 92),
+		radius: 5,
 		step:   1.0 / 7,
 	}
 
@@ -333,8 +439,9 @@ func run() {
 		dt := time.Since(last).Seconds()
 		last = time.Now()
 
-		// lerp the camera position towards the gopher
-		camPos = pixel.Lerp(camPos, phys.rect.Center(), 1-math.Pow(1.0/128, dt))
+		// next_camPos := pixel.Vec{X: camPos.X, Y: camPos.Y - dt*spe*6}
+		// camPos = pixel.Lerp(camPos, next_camPos, 1-math.Pow(1.0/128, dt))
+
 		cam := pixel.IM.Moved(camPos.Scaled(-1))
 		canvas.SetMatrix(cam)
 
@@ -366,6 +473,10 @@ func run() {
 		gol.update(dt)
 		anim.update(dt, phys)
 
+		// update the platforms
+		platforms = updatePlatforms(dt, platforms)
+		*gol = updategoal(gol, platforms, phys)
+
 		// draw the scene to the canvas using IMDraw
 		canvas.Clear(colornames.Black)
 		imd.Clear()
@@ -375,6 +486,12 @@ func run() {
 		gol.draw(imd)
 		anim.draw(imd, phys)
 		imd.Draw(canvas)
+
+		// golwriter.mu.Lock()
+		// defer golwriter.mu.Unlock()
+
+		// golwriter.regular.WriteString("goal: 0")
+		// golwriter.regular.Draw(win, pixel.IM.Moved(pixel.V(32, 32)))
 
 		// stretch the canvas to the window
 		win.Clear(colornames.White)
@@ -387,6 +504,7 @@ func run() {
 		canvas.Draw(win, pixel.IM.Moved(canvas.Bounds().Center()))
 		win.Update()
 	}
+	fmt.Println("Your score is ", score, "!")
 }
 
 func main() {
