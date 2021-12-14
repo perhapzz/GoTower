@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/csv"
-	"fmt"
 	"image"
 	"image/color"
 	"io"
@@ -328,31 +327,8 @@ func updategoal(gol *goal, platforms []platform, gp *gopherPhys) goal {
 			step:   1.0 / 7,
 		}
 	}
-
-	// else if gol.pos.X-gp.rect.Max.X > gol.radius && gol.pos.X-gp.rect.Min.X > gol.radius &&
-	// 		((gol.pos.Y-gp.rect.Max.Y > 0 && gol.pos.Y-gp.rect.Min.Y > 0)|| (gol.pos.Y-gp.rect.Min.Y > 0)) {
-	// }
 	return *gol
 }
-
-// func ttfFromBytesMust(b []byte, size float64) font.Face {
-// 	ttf, err := truetype.Parse(b)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	return truetype.NewFace(ttf, &truetype.Options{
-// 		Size:              size,
-// 		GlyphCacheEntries: 1,
-// 	})
-// }
-
-// type goalwriter struct {
-// 	mu sync.Mutex
-
-// 	regular *text.Text
-
-// 	position pixel.Vec
-// }
 
 func run() {
 	rand.Seed(time.Now().UnixNano())
@@ -386,19 +362,6 @@ func run() {
 		dir:   +1,
 	}
 
-	// golwriter := &goalwriter{
-	// 	regular: text.New(pixel.ZV, text.NewAtlas(
-	// 		ttfFromBytesMust(goregular.TTF, 42),
-	// 		text.ASCII, text.RangeTable(unicode.Latin),
-	// 	)),
-	// 	position: pixel.V(32, 32),
-	// }
-
-	// text.New(pixel.ZV, text.NewAtlas(
-	// 	ttfFromBytesMust(goregular.TTF, 42),
-	// 	text.ASCII, text.RangeTable(unicode.Latin),
-	// ))
-
 	// hardcoded level
 	platforms := []platform{
 		// {rect: pixel.R(20, 120, 70, 122)},
@@ -417,6 +380,7 @@ func run() {
 		{rect: pixel.R(-150, -120, -100, -118)},
 		// {rect: pixel.R(-100, -120, -50, -128)},
 	}
+
 	for i := range platforms {
 		platforms[i].color = randomNiceColor()
 	}
@@ -449,6 +413,8 @@ func run() {
 		if win.Pressed(pixelgl.KeyTab) {
 			dt /= 8
 		}
+
+		spe += dt
 
 		// restart the level on pressing enter
 		if win.JustPressed(pixelgl.KeyEnter) {
@@ -504,7 +470,7 @@ func run() {
 		canvas.Draw(win, pixel.IM.Moved(canvas.Bounds().Center()))
 		win.Update()
 	}
-	fmt.Println("Your score is ", score, "!")
+	// fmt.Println("Your score is ", score, "!")
 }
 
 func main() {
