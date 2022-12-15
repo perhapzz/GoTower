@@ -1,8 +1,8 @@
-## Pixel Examples
+## Go Tower
 
-This repository contains a few examples demonstrating [Pixel](https://github.com/faiface/pixel)'s functionality.
+Two game inspired by NS-Shaft, written in Go using the [Pixel](https://github.com/faiface/pixel).
 
-**To run an example**, navigate to its directory, then `go run` the `main.go` file. For example:
+**How to play**, navigate to its directory, then `go run` the `main.go` file. For example:
 
 ```
 $ cd platformer
@@ -11,14 +11,6 @@ $ go run main.go
 
 Here are some screenshots from the examples!
 
-| [Lights](lights) | [Platformer](platformer) |
+| [Gopher Up](GopherUp) | [Gopher Down](GopherDown) |
 | --- | --- |
-| ![Lights](lights/screenshot.png) | ![Platformer](platformer/screenshot.png) |
-
-| [Smoke](smoke) | [Typewriter](typewriter) |
-| --- | --- |
-| ![Smoke](smoke/screenshot.png) | ![Typewriter](typewriter/screenshot.png) |
-
-| [Raycaster](community/raycaster) | [Starfield](community/starfield) |
-| --- | --- |
-| ![Raycaster](community/raycaster/screenshot.png) | ![Starfield](community/starfield/screenshot.png) |
+| ![Lights](GopherUp/screenshot.png) | ![Platformer](GopherDown/screenshot.png) |

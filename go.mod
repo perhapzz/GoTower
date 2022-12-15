@@ -1,4 +1,4 @@
-module github.com/faiface/pixel-examples
+module GoTower
 
 go 1.16
 
